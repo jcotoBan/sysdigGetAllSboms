@@ -7,3 +7,5 @@ This script is very simple to use:
 3- Run the script
 
 4- On the script path an sboms.json file will be created, each sbom will have the sbom ids.
+
+* The scripts uses pagination in case of more than 1000 records.
