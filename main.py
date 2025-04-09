@@ -33,14 +33,50 @@ headers = {
     "Content-Type": "application/json"
 }
 
-response = requests.get(runtime_results_url, headers=headers)
-if response.status_code != 200:
-    raise Exception(f"Failed to fetch runtime results: {response.status_code} {response.text}")
+# Pagination in case of more than 1000 records.
 
-data = response.json()
-sbom_ids = [entry["sbomId"] for entry in data.get("data", [])]
+sbom_ids = []
+limit = 1000
+offset = 0
+seen_ids = set()
+
+print("Fetching runtime results with pagination...")
+
+while True:
+    paged_url = f"{runtime_results_url}?limit={limit}&offset={offset}"
+    response = requests.get(paged_url, headers=headers)
+
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch runtime results: {response.status_code} {response.text}")
+
+    page_data = response.json()
+    data_entries = page_data.get("data", [])
+
+    if not data_entries:
+        break  # No more records
+
+    new_ids = [entry["sbomId"] for entry in data_entries if entry["sbomId"] not in seen_ids]
+
+    if not new_ids:
+        print("No new IDs found in this page — stopping to avoid duplicates.")
+        break
+
+    sbom_ids.extend(new_ids)
+    seen_ids.update(new_ids)
+
+    print(f"Fetched {len(new_ids)} new entries (Total so far: {len(sbom_ids)})")
+
+    if len(data_entries) < limit:
+        break  # Last page reached
+
+    offset += limit
+
+#Individual sbom collections
 
 sbom_entries = []
+
+print(f"Fetching SBOMs for {len(sbom_ids)} IDs...")
+
 for sbom_id in sbom_ids:
     sbom_url = sboms_url_template.format(sbom_id)
     sbom_response = requests.get(sbom_url, headers=headers)
@@ -53,7 +89,8 @@ for sbom_id in sbom_ids:
     else:
         print(f"Warning: Failed to fetch SBOM for {sbom_id}: {sbom_response.status_code}")
 
+# Save to file
 with open("sboms.json", "w") as f:
     json.dump(sbom_entries, f, indent=2)
 
-print("SBOM data saved to sboms.json")
+print(f"✅ SBOM data saved to sboms.json ({len(sbom_entries)} entries).")
