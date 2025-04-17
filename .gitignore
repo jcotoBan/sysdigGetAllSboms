@@ -2,3 +2,4 @@
 sboms.json
 config.yaml
 .getSbomR/
+.gitignore
